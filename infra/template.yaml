@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: RecallLease operator-authenticated demo on AWS Lambda
+
+Parameters:
+  CockroachDatabaseUrlParameterName:
+    Type: String
+    MinLength: 3
+    AllowedPattern: '^/[A-Za-z0-9_.\-/]+$'
+    Description: Name of a Standard SecureString parameter containing the CockroachDB URL
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures:
+      - arm64
+    MemorySize: 512
+    Timeout: 30
+    Tracing: Active
+
+Resources:
+  ReceiptBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeletePublicDemoReceipts
+            Status: Enabled
+            ExpirationInDays: 7
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ReceiptBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ReceiptBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt ReceiptBucket.Arn
+              - !Sub "${ReceiptBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  RecallLeaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/lambda
+      Handler: main.handler
+      ReservedConcurrentExecutions: 2
+      Environment:
+        Variables:
+          RECALLLEASE_ENVIRONMENT: production
+          RECALLLEASE_BACKEND: cockroach
+          RECALLLEASE_EMBEDDING_BACKEND: deterministic
+          RECALLLEASE_EXPOSURE_MODE: aws_iam
+          RECALLLEASE_DATABASE_URL_PARAMETER: !Ref CockroachDatabaseUrlParameterName
+          RECALLLEASE_AWS_REGION: !Ref AWS::Region
+          RECALLLEASE_RECEIPT_BUCKET: !Ref ReceiptBucket
+          RECALLLEASE_CORS_ORIGINS: ""
+          RECALLLEASE_PUBLIC_SESSION_LIMIT_PER_HOUR: "20"
+          RECALLLEASE_SESSION_USE_LIMIT: "8"
+          RECALLLEASE_SESSION_TTL_MINUTES: "120"
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+        InvokeMode: BUFFERED
+      Policies:
+        - Statement:
+            - Sid: ReadDatabaseUrlParameter
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${CockroachDatabaseUrlParameterName}"
+            - Sid: DecryptDatabaseUrlParameter
+              Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  kms:ViaService: !Sub "ssm.${AWS::Region}.${AWS::URLSuffix}"
+                StringLike:
+                  kms:EncryptionContext:PARAMETER_ARN: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${CockroachDatabaseUrlParameterName}"
+            - Sid: PutContentAddressedReceipt
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "${ReceiptBucket.Arn}/receipts/*"
+
+  RecallLeaseLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${RecallLeaseFunction}
+      RetentionInDays: 3
+
+Outputs:
+  DemoUrl:
+    Description: IAM-authenticated RecallLease operator URL
+    Value: !GetAtt RecallLeaseFunctionUrl.FunctionUrl
+  ReceiptBucketName:
+    Description: Private seven-day receipt bucket
+    Value: !Ref ReceiptBucket

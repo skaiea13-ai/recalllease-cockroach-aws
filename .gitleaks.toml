@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated build and media artifacts"
+paths = [
+  '''^\.aws-sam/''',
+  '''^build/''',
+  '''^dist/''',
+  '''^output/''',
+]

@@ -1,0 +1,46 @@
+[project]
+name = "recalllease-cockroach-aws"
+version = "0.1.0"
+description = "Expiry- and revocation-aware persistent memory for autonomous agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.43.67",
+    "fastapi>=0.141.1",
+    "mangum>=0.21.0",
+    "psycopg[binary,pool]>=3.3.4",
+    "pydantic-settings>=2.15.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.7.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.2",
+    "uvicorn[standard]>=0.52.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config --cov=recalllease --cov-report=term-missing"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = [".aws-sam", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]

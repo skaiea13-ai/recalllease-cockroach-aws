@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="RecallLease proves that an agent cannot reuse revoked or expired memory after restart."
+    />
+    <title>RecallLease — Memory that expires safely</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="wordmark" href="/" aria-label="RecallLease home">RecallLease</a>
+      <p id="environment-label">Preparing a private demo session…</p>
+    </header>
+
+    <main class="app-shell">
+      <section class="timeline-pane" aria-labelledby="timeline-title">
+        <div class="pane-heading">
+          <h1 id="timeline-title">Memory timeline</h1>
+          <p>One policy, one revocation, one fresh agent.</p>
+        </div>
+
+        <ol class="timeline" aria-live="polite">
+          <li class="timeline-event timeline-event--grant" data-step="grant">
+            <span class="timeline-marker" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m6.5 12.5 3.4 3.4 7.6-8" />
+              </svg>
+            </span>
+            <div>
+              <h2>Permission recorded</h2>
+              <time id="grant-time">Waiting</time>
+              <p>Allow the agent to publish a sanitized weekly status.</p>
+              <span class="event-meta">Source: demo-user · TTL: 2h</span>
+            </div>
+          </li>
+
+          <li class="timeline-event timeline-event--revoke is-pending" data-step="revoke">
+            <span class="timeline-marker" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m7 7 10 10M17 7 7 17" />
+              </svg>
+            </span>
+            <div>
+              <h2>Permission revoked</h2>
+              <time id="revoke-time">Not recorded</time>
+              <p class="revoked-copy">Allow the agent to publish a sanitized weekly status.</p>
+              <span class="event-meta">A newer policy will supersede the grant.</span>
+            </div>
+          </li>
+
+          <li class="timeline-event timeline-event--restart is-pending" data-step="restart">
+            <span class="timeline-marker" aria-hidden="true"></span>
+            <div>
+              <h2>Agent restarted</h2>
+              <time id="restart-time">Not started</time>
+              <p>A fresh agent instance retrieves memory before acting.</p>
+              <span class="event-meta" id="agent-id">No instance assigned</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="decision-pane" aria-labelledby="decision-title">
+        <div class="decision-heading">
+          <div>
+            <h2 id="decision-title">Can the agent publish?</h2>
+            <p>Evaluate the action against valid memory, never process-local state.</p>
+          </div>
+          <span class="run-state" id="run-state" aria-live="polite">Ready</span>
+        </div>
+
+        <div class="request-block">
+          <span class="section-label">Requested action</span>
+          <p>Publish the weekly status publicly</p>
+        </div>
+
+        <div class="evidence-block">
+          <div class="section-heading-row">
+            <span class="section-label">Policy chain evidence · newest first</span>
+            <span id="evidence-count">0 records</span>
+          </div>
+          <div class="evidence-list" id="evidence-list">
+            <div class="empty-evidence">
+              Run the replay to retrieve active policy memory.
+            </div>
+          </div>
+        </div>
+
+        <div class="decision-result is-idle" id="decision-result" aria-live="assertive">
+          <div class="result-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <path d="M16 2.5 27 7v7.7c0 7.2-4.7 12.1-11 14.8-6.3-2.7-11-7.6-11-14.8V7l11-4.5Z" />
+              <path d="m11 11 10 10M21 11 11 21" />
+            </svg>
+          </div>
+          <div>
+            <span class="section-label">Decision</span>
+            <strong id="decision-word">WAITING</strong>
+            <h3 id="decision-rule">Newest valid memory wins.</h3>
+            <p id="decision-reason">No action has been evaluated yet.</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="button button--primary" id="run-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 6 8 6-8 6V6Z" />
+            </svg>
+            Run replay
+          </button>
+          <button class="button button--secondary" id="reset-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path d="M6.1 9A7 7 0 0 1 18 6.5L20 9M18 15a7 7 0 0 1-11.9 2.5L4 15" />
+            </svg>
+            Reset
+          </button>
+        </div>
+      </section>
+
+      <aside class="receipt-pane" aria-labelledby="receipt-title">
+        <div class="pane-heading">
+          <h2 id="receipt-title">Receipt</h2>
+          <p>Content-addressed proof of what the agent saw.</p>
+        </div>
+
+        <dl class="receipt-list">
+          <div>
+            <dt>Decision</dt>
+            <dd class="receipt-decision" id="receipt-decision">Pending</dd>
+          </div>
+          <div>
+            <dt>Decision time · UTC</dt>
+            <dd id="receipt-time">—</dd>
+          </div>
+          <div>
+            <dt>Agent instance</dt>
+            <dd id="receipt-agent">—</dd>
+          </div>
+          <div>
+            <dt>Retrieval query · SHA-256</dt>
+            <dd id="receipt-query-hash">—</dd>
+          </div>
+          <div>
+            <dt>Memory set · SHA-256</dt>
+            <dd id="receipt-memory-hash">—</dd>
+          </div>
+          <div>
+            <dt>Evidence count</dt>
+            <dd id="receipt-evidence-count">0</dd>
+          </div>
+        </dl>
+
+        <div class="provenance">
+          <span class="section-label">Provenance</span>
+          <div class="provenance-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z" />
+              <path d="m4 11 8 3.5 8-3.5M4 15.5 12 19l8-3.5" />
+            </svg>
+            <div>
+              <strong id="memory-provider">Memory store</strong>
+              <span id="memory-provider-detail">Checking backend…</span>
+            </div>
+          </div>
+          <div class="provenance-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v18M4.2 7.5 19.8 16.5M19.8 7.5 4.2 16.5" />
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+            <div>
+              <strong id="embedding-provider">Vector retrieval</strong>
+              <span id="embedding-provider-detail">Checking provider…</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="receipt-hash">
+          <span class="section-label">Receipt hash · SHA-256</span>
+          <code id="receipt-hash">Not generated</code>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="app-footer">
+      <span>No password, phone number, or personal profile is stored in this demo.</span>
+      <a id="api-schema-link" href="/docs" target="_blank" rel="noreferrer">API schema</a>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+Next, a fresh agent instance starts with no trusted process-local memory. AWS Lambda builds the requested action into a deterministic query vector, and CockroachDB performs distributed vector retrieval over only active, currently valid records. The older allow is still auditable, but it can no longer authorize anything.

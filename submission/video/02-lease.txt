@@ -1,0 +1,1 @@
+This agent was allowed to publish a sanitized weekly status. The permission has a source, validity window, content hash, and tenant boundary. It is a lease, not an immortal prompt fragment.

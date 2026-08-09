@@ -1,0 +1,1 @@
+Agent memory is usually judged by what it remembers. Recall Lease focuses on what it must stop remembering: an expired permission, a revoked instruction, or a policy that has been replaced.

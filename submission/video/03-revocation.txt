@@ -1,0 +1,1 @@
+A newer policy now revokes publication. CockroachDB updates both sides in one transaction: the old allow becomes superseded, and the denial becomes active. The lease line ends here.
