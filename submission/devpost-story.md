@@ -37,24 +37,23 @@ transaction supersedes the old policy and inserts the new one. Distributed
 Vector Indexing retrieves the closest active memories without splitting vector
 state from the transactional ledger.
 
-The deployment workflow is designed to use `ccloud` CLI to create and inspect a
-resource-capped Basic cluster. This is the second CockroachDB tool in the
-project. The runtime profile is a FastAPI application on AWS Lambda, packaged
-with AWS SAM. Lambda computes deterministic query vectors in process, so the
-template grants no paid model-inference permission. Private,
-content-addressed receipts are designed to go to Amazon S3 and expire after
-seven days.
+I used `ccloud` CLI to create and inspect a resource-capped Basic cluster. This
+is the second CockroachDB tool in the project. The runtime profile packages a
+FastAPI application for AWS Lambda with AWS SAM. Lambda computes deterministic
+query vectors in process, so the template grants no paid model-inference
+permission. The cloud profile writes private, content-addressed receipts to
+Amazon S3 with a seven-day lifecycle.
 
-The template gives the hosted Function URL AWS IAM authentication. The planned
-browser walkthrough runs on loopback while using verified CockroachDB and S3
-adapters, protected by a random capability that is removed from the address bar
-before recording. This keeps credentials and account screens out of the video
-and avoids an anonymous endpoint that could be abused to create cloud costs.
+The template gives the hosted Function URL AWS IAM authentication. The browser
+walkthrough runs on loopback with the CockroachDB and S3 adapters. A random
+capability protects the loopback page and disappears from the address bar
+before recording. Credentials and account screens stay out of the video, and
+the hosted endpoint never becomes anonymous.
 
 A separate public replay runs the same fixed policy story entirely in the
 browser. It is labeled as a fixture, makes no cloud claim, and uses a CSP that
-forbids network API calls. A final submission can claim the cloud memory path
-only after a continuous video captures that path working.
+forbids network API calls. The continuous video is the evidence for the real
+CockroachDB and AWS path.
 
 ## The consistency problem
 
@@ -82,7 +81,7 @@ only active memory may affect the decision. It also has to distinguish the
 offline replay from the cloud path without implying that local data came from
 CockroachDB.
 
-Cost controls changed the architecture as well. The Lambda URL is IAM-only,
+Cost controls changed the architecture. The Lambda URL is IAM-only,
 concurrency is capped at two, sessions have a fixed use budget, S3 objects have
 a short lifecycle, and the default embedding path makes no remote model call.
 The SAM build copies an exact 15-file runtime manifest, which keeps untracked
@@ -92,13 +91,16 @@ not the password-bearing database URL.
 
 ## Verification
 
-The current suite has 45 tests and 90.50 percent branch-aware coverage. It
+The current suite has 72 tests and 90.50 percent branch-aware coverage. It
 includes regressions for cross-site session creation, application and database
 clock skew, expiry during a memory write, concurrent policy changes, tenant
 isolation, exhausted session budgets, unstructured permission matches,
 cloud-loopback authentication, exact Lambda packaging, and encrypted parameter
-retrieval. Ruff, CloudFormation linting, the frozen dependency export, gitleaks,
-and a local AWS SAM build are separate release gates.
+retrieval. The cloud gate also rejects a non-Free AWS account, the wrong account
+identity, expired credits, an oversized CockroachDB cluster, a nonzero draft
+invoice, or missing trial-credit coverage. Ruff, CloudFormation linting, the
+frozen dependency export, gitleaks, and a local AWS SAM build are separate
+release gates.
 
 The browser replay was checked at desktop size and at 390 by 844 pixels. Both
 paths finish with two policy records, a populated receipt, and a visible

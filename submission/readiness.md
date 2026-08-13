@@ -22,7 +22,7 @@ source. The public replay is visibly labeled as a fixture and has
 `connect-src 'none'`; it is not presented as cloud evidence.
 
 The public repository and Pages site exist, and the privacy-safe release history
-is published at commit `8a8dab0e6a1660e8411837d7378e4f7bbee59182`. The live CockroachDB cluster is
+is published on `main`. The live CockroachDB cluster is
 `BASIC`, `AWS`, `us-east-1`, `CREATED`, and capped at 1,000,000 RUs plus 1 GiB
 storage per month; `scripts.verify_zero_cost_cloud --cockroach-only` passes
 against that state and the current USD 0 draft invoice with applied free-trial
