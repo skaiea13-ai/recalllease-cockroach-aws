@@ -48,6 +48,9 @@ def _read_configuration() -> tuple[str, str, str]:
         ) from error
     if admin_connection_info.get("sslmode") != "verify-full":
         raise RuntimeError("RECALLLEASE_ADMIN_DATABASE_URL must use sslmode=verify-full")
+    admin_user = admin_connection_info.get("user")
+    if not admin_user or admin_user == APP_USER:
+        raise RuntimeError("RECALLLEASE_ADMIN_DATABASE_URL must use a separate administrator login")
 
     database_name = os.environ.get("RECALLLEASE_DATABASE_NAME", APP_DATABASE).strip()
     if not DATABASE_NAME_PATTERN.fullmatch(database_name):
@@ -71,6 +74,7 @@ def bootstrap() -> None:
             sql.SQL("CREATE DATABASE IF NOT EXISTS {}").format(sql.Identifier(database_name))
         )
         connection.execute(sql.SQL("CREATE USER IF NOT EXISTS {}").format(sql.Identifier(APP_USER)))
+        connection.execute(sql.SQL("REVOKE admin FROM {}").format(sql.Identifier(APP_USER)))
         connection.execute(
             sql.SQL("ALTER USER {} WITH PASSWORD {}").format(
                 sql.Identifier(APP_USER),
@@ -88,6 +92,12 @@ def bootstrap() -> None:
         connection.execute(
             sql.SQL("REVOKE CONNECT ON DATABASE {} FROM PUBLIC").format(
                 sql.Identifier(database_name)
+            )
+        )
+        connection.execute(
+            sql.SQL("REVOKE ALL ON DATABASE {} FROM {}").format(
+                sql.Identifier(database_name),
+                sql.Identifier(APP_USER),
             )
         )
         connection.execute(

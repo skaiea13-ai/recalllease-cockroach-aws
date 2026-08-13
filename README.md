@@ -97,23 +97,34 @@ credentials or expose an anonymously invokable cloud endpoint.
 
 The cloud submission plan uses two required CockroachDB tools: `ccloud` CLI to
 provision and inspect a bounded Basic cluster, and Distributed Vector Indexing
-for active-memory retrieval. Create nothing until the account confirms a
-zero-cost path. If that gate is satisfied, use an explicit resource cap and
-recheck the current region and limits before the state-changing command:
+for active-memory retrieval. Create nothing until AWS reports an active Free
+account plan with remaining credits. The verifier rejects Paid, expired,
+wrong-account, low-lifetime, and unparseable states:
+
+```bash
+uv run python -m scripts.verify_zero_cost_cloud --aws-only
+```
+
+If that gate passes, create one Basic cluster with limits far below the trial
+credit and inspect the resulting live state immediately:
 
 ```bash
 ccloud auth login
 ccloud cluster create BASIC recalllease us-east-1 \
   --cloud AWS --request-unit-limit 1000000 --storage-gib-limit 1 --wait
+uv run python -m scripts.verify_zero_cost_cloud --cockroach-only
 ```
 
-Bootstrap a dedicated `recalllease` database with an administrator connection
-before deploying. The script creates the schema and the `recalllease_app`
-runtime user, then verifies that the runtime login can read the required tables.
-The password prompt is hidden; use a unique value of at least 32 characters.
+Bootstrap a dedicated `recalllease` database with a separate administrator
+connection before deploying. Do not use `recalllease_app` as the administrator:
+console-created SQL users initially receive `admin`. The script creates or
+updates the runtime user, removes its `admin` membership, grants only the needed
+database and table privileges, and verifies that it can read the required
+tables. The password prompt is hidden; use a unique value of at least 32
+characters.
 
 ```bash
-export RECALLLEASE_ADMIN_DATABASE_URL='postgresql://.../defaultdb?sslmode=verify-full'
+export RECALLLEASE_ADMIN_DATABASE_URL='host=... port=26257 dbname=defaultdb user=recalllease_bootstrap sslmode=verify-full sslrootcert=/absolute/path/to/ca-bundle.pem'
 uv run python -m scripts.bootstrap_database
 ```
 
@@ -131,6 +142,7 @@ aws ssm put-parameter \
   --value "$RECALLLEASE_DATABASE_URL"
 unset RECALLLEASE_DATABASE_URL
 
+uv run python -m scripts.verify_zero_cost_cloud
 uv run python -m scripts.build_sam
 sam deploy --guided \
   --template-file .aws-sam/build/template.yaml \
@@ -149,14 +161,28 @@ S3 receipt bucket is present, and the decrypted DSN uses the dedicated
 `sslmode=verify-full`. Runtime startup only validates the schema; the Lambda
 role cannot create users, databases, tables, or indexes.
 
-[AWS documents](https://aws.amazon.com/systems-manager/pricing/) Standard
-Parameter Store parameters and standard-throughput API interactions as having
-no additional charge. `SecureString` still invokes AWS KMS, whose
-[pricing](https://aws.amazon.com/kms/pricing/) charges managed-key API requests
-after the monthly request allowance. Lambda, S3, and CockroachDB can also incur
-charges. Under a strict zero-cost rule, the commands above are reference only:
-do not deploy this profile or record a cloud demo. The repository itself creates
-no cloud resources.
+Basic clusters expose SQL through an IP allowlist. The bounded demo keeps DB
+Console access disabled, but the Lambda Function URL does not provide a stable
+outbound address without adding a paid VPC/NAT path, so SQL remains reachable
+from `0.0.0.0/0`. That is network reachability, not anonymous database access:
+the only deployed login is the random, password-authenticated
+`recalllease_app` role above, TLS hostname and CA verification are mandatory,
+and the role has no `admin`, DDL, user-management, or database-ownership rights.
+Do not weaken those controls or deploy the bootstrap administrator credential.
+
+[AWS documents](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html)
+that a Free account plan incurs no charges and closes when its credits or plan
+lifetime are exhausted. Never upgrade this demo account, join AWS Organizations,
+or enable another feature that converts it to Paid. The fail-closed verifier
+requires `FREE` and `ACTIVE`, positive USD credits, the same STS account, and at
+least seven days remaining before every deploy. The CockroachDB verifier requires
+the exact `recalllease` Basic cluster on AWS with no more than 1,000,000 RUs and
+1 GiB storage per month. It also requires the current `ccloud` draft invoice to
+total exactly USD 0, show an applied negative `Free trial credits` adjustment,
+and cover at least seven more days. This does not rely on the separate monthly
+Basic credit, which requires a pay-as-you-go payment method. The trial
+organization has no payment method; never add one. If either verifier fails, do
+not deploy or record the cloud demo.
 
 The template's default profile performs embeddings inside Lambda and grants no
 Bedrock permission, removing per-token model charges. The optional `bedrock`

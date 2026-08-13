@@ -24,19 +24,50 @@
 - The Lambda environment contains only a Parameter Store name. The dedicated
   role reads one Standard `SecureString` at cold start; the database URL is
   neither committed nor stored in Lambda configuration.
-- `SecureString` uses AWS KMS. Because KMS, Lambda, S3, and CockroachDB usage can
-  incur charges, the cloud profile is not deployed under the project's strict
-  zero-cost gate.
+- `SecureString` uses AWS KMS. The deployment procedure requires the live AWS
+  account to be `FREE` and `ACTIVE`, have positive credits and at least seven
+  days remaining, and match the active STS identity.
 - Database bootstrap requires `sslmode=verify-full` and uses a separate
   administrator URL. Production accepts only the dedicated `recalllease_app`
   login to the `recalllease` database with password authentication and
-  `sslmode=verify-full`; that role has no DDL, user-management, or database-
-  ownership grants.
+  `sslmode=verify-full`; bootstrap explicitly revokes its default `admin`
+  membership and grants no DDL, user-management, or database-ownership rights.
 - Production fails closed when the private receipt bucket is missing.
 - Raw session tokens and loopback capabilities are not logged, persisted, or
   placed in the DOM.
 - AWS credentials are provided by the Lambda execution role.
 - S3 permits no public access and uses server-side encryption.
+
+## Database network boundary
+
+- The live Basic cluster's DB Console allowlist is disabled. SQL is reachable
+  from `0.0.0.0/0` because an ordinary Lambda Function URL has no stable egress
+  address and adding VPC/NAT infrastructure would violate the zero-cost gate.
+- Public reachability does not grant a database session. Production requires
+  TLS `verify-full`, the Cockroach Cloud CA chain, and the random
+  `recalllease_app` password.
+- The runtime role has no `admin` membership or role options, cannot create a
+  table, and holds exactly `SELECT`, `INSERT`, and `UPDATE` on the four required
+  tables. The separate bootstrap administrator remains local and is never
+  deployed.
+- If a future zero-cost hosting path supplies a stable egress CIDR, replace the
+  all-address SQL allowlist with that CIDR before redeploying.
+
+## Cost boundary
+
+- `scripts.verify_zero_cost_cloud` fails closed on missing, malformed, expired,
+  Paid, or wrong-account AWS plan state.
+- The exact CockroachDB cluster must be `BASIC`, `CREATED`, hosted on AWS, and
+  capped at 1,000,000 RUs plus 1 GiB storage per month. Non-finite and missing
+  limits are rejected.
+- The current CockroachDB draft invoice must total exactly USD 0, contain a
+  negative `Free trial credits` adjustment, and cover at least seven more days.
+  The verifier does not treat the monthly Basic credit as available because it
+  requires pay-as-you-go billing.
+- The bounded CockroachDB trial has no payment method. Never add one; losing
+  trial eligibility must stop deployment rather than transition to paid use.
+- Never upgrade the AWS account, join AWS Organizations, or enable a feature that
+  converts the account to Paid. A failed preflight means no deploy and no video.
 
 ## Decision consistency
 
