@@ -311,3 +311,84 @@ def test_database_bootstrap_requires_verified_tls(monkeypatch: pytest.MonkeyPatc
     _, database_name, password = bootstrap_module._read_configuration()
     assert database_name == APP_DATABASE
     assert password == runtime_password
+
+
+def test_database_bootstrap_requires_a_separate_administrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "RECALLLEASE_ADMIN_DATABASE_URL",
+        make_conninfo(
+            host="example.invalid",
+            dbname="defaultdb",
+            user=APP_USER,
+            sslmode="verify-full",
+        ),
+    )
+    monkeypatch.setenv(
+        "RECALLLEASE_APP_PASSWORD",
+        hashlib.sha256(b"bootstrap-test-credential").hexdigest(),
+    )
+
+    with pytest.raises(RuntimeError, match="separate administrator"):
+        bootstrap_module._read_configuration()
+
+
+def test_database_bootstrap_revokes_console_default_admin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_password = hashlib.sha256(b"runtime-test-credential").hexdigest()
+    bootstrap_password = hashlib.sha256(b"bootstrap-test-credential").hexdigest()
+    admin_url = make_conninfo(
+        host="example.invalid",
+        dbname="defaultdb",
+        user="recalllease_bootstrap",
+        password=bootstrap_password,
+        sslmode="verify-full",
+    )
+    statements: list[list[str]] = []
+    connection_urls: list[str] = []
+
+    class RecordingConnection:
+        def __init__(self, connection_url: str) -> None:
+            connection_urls.append(connection_url)
+            statements.append([])
+
+        def __enter__(self) -> RecordingConnection:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def execute(self, statement: object) -> None:
+            statements[-1].append(repr(statement))
+
+    monkeypatch.setattr(
+        bootstrap_module,
+        "_read_configuration",
+        lambda: (admin_url, APP_DATABASE, runtime_password),
+    )
+    monkeypatch.setattr(
+        bootstrap_module.psycopg,
+        "connect",
+        lambda connection_url, *, autocommit: RecordingConnection(connection_url),
+    )
+
+    bootstrap_module.bootstrap()
+
+    assert len(connection_urls) == 3
+    assert conninfo_to_dict(connection_urls[0])["user"] == "recalllease_bootstrap"
+    assert conninfo_to_dict(connection_urls[2])["user"] == APP_USER
+    create_index = next(
+        index
+        for index, statement in enumerate(statements[0])
+        if "CREATE USER IF NOT EXISTS" in statement
+    )
+    revoke_index = next(
+        index for index, statement in enumerate(statements[0]) if "REVOKE admin FROM" in statement
+    )
+    password_index = next(
+        index for index, statement in enumerate(statements[0]) if "ALTER USER" in statement
+    )
+    assert create_index < revoke_index < password_index
+    assert any("REVOKE ALL ON DATABASE" in statement for statement in statements[1])
